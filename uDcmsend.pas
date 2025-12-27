@@ -1,0 +1,545 @@
+unit uDcmsend;
+
+interface
+
+uses
+  Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
+  Dialogs, StdCtrls, ShellApi, IdHTTP, IdGlobal, IdIOHandlerSocket,
+  IdMultipartFormData, IdBaseComponent, IdComponent, IdTCPConnection,
+  IdTCPClient, IdAuthentication, IdTCPServer, IdCustomHTTPServer,
+  IdHTTPServer, ADODB, DB, ZConnection, ZAbstractRODataset, ZAbstractDataset,
+  ZDataset, ZAbstractConnection, XMLIntf, XMLDoc, IniFiles, Grids, DBGrids,
+  ExtCtrls, jpeg, XPMan, CurvyControls, TaskDialog, AdvShape,
+  AdvGlassButton, AdvSmoothButton, AdvGlowButton, AdvSmoothToggleButton,
+  W7Classes, W7Buttons, AdvCircularProgress;
+
+type
+  TfSendDcm = class(TForm)
+    OpenDialog1: TOpenDialog;
+    IdHTTP1: TIdHTTP;
+    ZConnection1: TZConnection;
+    ZQuery1: TZQuery;
+    ZQuery1noorder: TStringField;
+    ZQuery1no_rawat: TStringField;
+    ZQuery1no_rkm_medis: TStringField;
+    ZQuery1nm_pasien: TStringField;
+    ZQuery1tgl_permintaan: TDateField;
+    ZQuery1jam_permintaan: TTimeField;
+    ZQuery1kd_pj: TStringField;
+    ZQuery1png_jawab: TStringField;
+    ZQuery1nm_perawatan: TStringField;
+    ZQuery1tgl_lahir: TDateField;
+    ZQuery1jk: TStringField;
+    ZQuery1tgl_sampel: TDateField;
+    ZQuery1jam_sampel: TTimeField;
+    ZQuery1tgl_hasil: TDateField;
+    ZQuery1jam_hasil: TTimeField;
+    ZQuery1kd_jenis_prw: TStringField;
+    ZQuery1dokter_perujuk: TStringField;
+    ZQuery1nm_dokter: TStringField;
+    ZQuery1nm_poli: TStringField;
+    ZQuery1informasi_tambahan: TStringField;
+    ZQuery1diagnosa_klinis: TStringField;
+    Panel2: TPanel;
+    Panel3: TPanel;
+    Image2: TImage;
+    XPManifest1: TXPManifest;
+    Panel1: TPanel;
+    Panel5: TPanel;
+    Panel6: TPanel;
+    CurvyPanel1: TCurvyPanel;
+    Label2: TLabel;
+    Label3: TLabel;
+    Label4: TLabel;
+    Label5: TLabel;
+    Label6: TLabel;
+    Label7: TLabel;
+    Label8: TLabel;
+    Label9: TLabel;
+    Label10: TLabel;
+    Label11: TLabel;
+    Label12: TLabel;
+    Label13: TLabel;
+    Label14: TLabel;
+    Label15: TLabel;
+    Label16: TLabel;
+    Label17: TLabel;
+    lTglLahir: TLabel;
+    lDokter: TLabel;
+    lJekel: TLabel;
+    lNama: TLabel;
+    lNoRM: TLabel;
+    lNoRawat: TLabel;
+    lTglSample: TLabel;
+    Label19: TLabel;
+    Label20: TLabel;
+    lPukul: TLabel;
+    Label22: TLabel;
+    Label23: TLabel;
+    Label18: TLabel;
+    Label21: TLabel;
+    Label24: TLabel;
+    Label25: TLabel;
+    lAnatomical: TLabel;
+    lExposure: TLabel;
+    lACSN: TLabel;
+    Label1: TLabel;
+    eNoPermintaan: TEdit;
+    cModality: TComboBox;
+    Panel4: TPanel;
+    Panel7: TPanel;
+    GroupBox1: TGroupBox;
+    MemoLog: TMemo;
+    Panel8: TPanel;
+    Label26: TLabel;
+    Panel10: TPanel;
+    CurvyPanel2: TCurvyPanel;
+    Panel9: TPanel;
+    btBaru: TButton;
+    Button3: TButton;
+    Button1: TButton;
+    AdvShape1: TAdvShape;
+    AdvShape2: TAdvShape;
+    Panel11: TPanel;
+    Panel12: TPanel;
+    Panel13: TPanel;
+    Panel14: TPanel;
+    Button2: TButton;
+    Image3: TImage;
+    Image1: TImage;
+    procedure btBaruClick(Sender: TObject);
+    procedure Button3Click(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
+    procedure eNoPermintaanKeyPress(Sender: TObject; var Key: Char);
+    procedure Button2Click(Sender: TObject);
+    procedure Image1Click(Sender: TObject);
+  private
+  Procedure Tampil;
+  Procedure ConvertDcm;
+  Procedure SendOrthanc;
+    { Private declarations }
+    
+  public
+  Procedure Bersih;
+  Procedure connect;
+    { Public declarations }
+  end;
+
+var
+  fSendDcm: TfSendDcm;
+  OutputFile, ORTHANC_URL, USERNAME, PASSWORD, Query, NamaRS : string;
+  koneksi : TIniFile;
+
+implementation
+
+uses uLoad;
+
+{$R *.dfm}
+
+function RemoveDots(const InputString: string): string;
+var
+  I: Integer;
+  Ch: Char;
+  ResultString: string; // Menggunakan tipe string standar di D7
+begin
+  ResultString := '';
+  
+  // Looping melalui setiap karakter dalam string input
+  for I := 1 to Length(InputString) do
+  begin
+    Ch := InputString[I];
+    
+    // Pengecekan:
+    // Jika karakter saat ini BUKAN titik DAN BUKAN spasi
+    if (Ch <> '/') and (Ch <> ':') then
+    begin
+      // Tambahkan karakter yang valid ke string hasil
+      ResultString := ResultString + Ch;
+    end;
+    // Jika karakter adalah '.' atau ' ', maka karakter tersebut di-skip
+  end;
+  
+  Result := ResultString;
+end;
+
+procedure TfSendDcm.Bersih;
+begin
+eNoPermintaan.Text:='';
+lAnatomical.Caption:='';
+lExposure.Caption:='';
+cModality.Text:='';
+lDokter.Caption:='';
+lPukul.Caption:='';
+lTglSample.Caption:='';
+lNama.Caption:='';
+lNoRawat.Caption:='';
+lNoRM.Caption:='';
+lJekel.Caption:='';
+lTglLahir.Caption:='';
+lACSN.Caption:='';
+MemoLog.Lines.Clear;
+OpenDialog1.FileName:='';
+Image1.Picture:=nil;
+btBaru.SetFocus;
+end;
+
+procedure TfSendDcm.Button1Click(Sender: TObject);
+begin
+IF OpenDialog1.FileName = '' THEN
+BEGIN
+        MessageDlg('Gambar Kosong..!!!',mtWarning, [MBOK],0);
+        btBaru.SetFocus;
+        Exit;
+END;
+
+IF eNoPermintaan.Text = '' THEN
+BEGIN
+        MessageDlg('No Permintaan Kosong..!!!',mtWarning, [MBOK],0);
+        eNoPermintaan.SetFocus;
+        Exit;
+END;
+
+IF cModality.Text = '' THEN
+BEGIN
+        MessageDlg('Modality Kosong..!!!',mtWarning, [MBOK],0);
+        cModality.SetFocus;
+        Exit;
+END;
+
+
+
+ConvertDcm;
+SendOrthanc;
+end;
+
+
+procedure TfSendDcm.Button3Click(Sender: TObject);
+begin
+Bersih;
+end;
+
+procedure TfSendDcm.btBaruClick(Sender: TObject);
+begin
+Bersih;
+  OpenDialog1.Filter := 'JPEG Files (*.jpg;*.jpeg)|*.jpg;*.jpeg';
+  OpenDialog1.FilterIndex := 1;
+
+  if OpenDialog1.Execute then
+  begin
+    Image1.Picture.LoadFromFile(OpenDialog1.FileName);
+    MemoLog.Lines.Add('File terpilih: ' + OpenDialog1.FileName);
+    eNoPermintaan.SetFocus;
+  end
+  else
+  begin
+    MemoLog.Lines.Add('eee.... ragu ragu');
+    Exit;
+  end;
+end;
+
+procedure TfSendDcm.connect;
+begin
+
+koneksi := TIniFile.Create(ExtractFilePath(Application.ExeName)+ 'conf.ini'); //tipe single database
+if (ZConnection1.Connected) then
+ZConnection1.Disconnect;
+ZConnection1.HostName := koneksi.ReadString('Database','Hostname','');
+ZConnection1.User     := koneksi.ReadString('Database','User','');
+ZConnection1.Password := koneksi.ReadString('Database','Password','');
+ZConnection1.Port     := StrToInt(koneksi.ReadString('Database','Port',''));
+ZConnection1.Database := koneksi.ReadString('Database','Database','');
+ZConnection1.Protocol := koneksi.ReadString('Database','Protokol','');
+ZConnection1.LibraryLocation := ExtractFilePath(Application.ExeName)+'\libmysql.dll';
+ORTHANC_URL           := koneksi.ReadString('Orthanc','HostnameOrthanc','');
+USERNAME              := koneksi.ReadString('Orthanc','UserOrthanc','');
+PASSWORD              := koneksi.ReadString('Orthanc','PasswordOrthanc','');
+ORTHANC_URL           := ORTHANC_URL+'instances';
+NamaRS                := koneksi.ReadString('Orthanc','Nama','');
+
+ try
+  ZConnection1.Connect;
+  zConnection1.Connected    :=True;
+    if (ZConnection1.Connected)  then
+      begin
+      //Label2.Caption := 'Connection Sukses...';
+      end
+        except
+        //Label2.Caption := 'Connection Gagal...';
+        end;
+end;
+
+procedure TfSendDcm.ConvertDcm;
+var
+  InputFile: string;
+  DCMTKPath: string;
+  DCMTKCommand: string;
+  DCMTKBaseCommand: string;
+  DICOMTags: string;
+  SEInfo: TShellExecuteInfo;
+  AppRunning: Boolean;
+  AppDirectory: string;
+  NamaGambar: string;
+begin
+  AppDirectory := ExtractFilePath(Application.ExeName);
+
+
+  // --- KONFIGURASI ---
+  // Pastikan path ini benar sesuai lokasi img2dcm.exe di sistem Anda
+  DCMTKPath := AppDirectory+'dcmtk\bin\'; // Ganti dengan path DCMTK Anda
+
+  // File input dan output
+  InputFile := OpenDialog1.FileName; // Ganti dengan path file JPG Anda
+  NamaGambar:= ExtractFileName(OpenDialog1.FileName);
+  NamaGambar := ChangeFileExt(NamaGambar, '');
+  OutputFile := AppDirectory+'imagedcm\'+NamaGambar+'.dcm'; // Path file DCM hasil konversi
+
+// 1. Definisikan Tag DICOM yang ingin diinjeksi
+  DICOMTags :=
+    ' -k "StudyID='+eNoPermintaan.Text+'"' +
+    ' -k "ReferringPhysicianName='+lDokter.Caption+'"' +
+    ' -k "PatientName='+lNama.Caption+'"' +
+    ' -k "InstitutionName='+NamaRS+'"' +
+    ' -k "RequestingPhysician='+lAnatomical.Caption+'"' +
+    ' -k "PatientID='+lNoRM.Caption+'"' +
+    ' -k "PatientSex='+lJekel.Caption+'"' +
+    ' -k "StudyDescription='+lExposure.Caption+'"' +
+    ' -k "AccessionNumber='+lACSN.Caption+'"' +
+    ' -k "Modality='+cModality.Text+'"' +
+    ' -k "StudyTime='+RemoveDots(lPukul.Caption)+'"' +
+    ' -k "PatientBirthDate='+RemoveDots(lTglLahir.Caption)+'"' +
+    ' -k "StudyDate='+RemoveDots(lTglSample.Caption)+'"'; // Mengisi beberapa tag wajib
+
+  // 2. Buat Perintah Utama
+  // img2dcm.exe <input> <output> [opsi-opsi]
+  // -vlp: Visible Light Photographic Image (rekomendasi untuk foto)
+  DCMTKBaseCommand := Format('%simg2dcm.exe %s %s -vlp', [DCMTKPath, InputFile, OutputFile]);
+
+  // 3. Gabungkan Perintah Dasar dengan Tag-Tag DICOM
+  DCMTKCommand := DCMTKBaseCommand + ' ' + DICOMTags; // --- END KONFIGURASI ---
+
+  // Panggil img2dcm.exe menggunakan ShellExecuteEx
+
+  FillChar(SEInfo, SizeOf(SEInfo), 0);
+  SEInfo.cbSize := SizeOf(TShellExecuteInfo);
+  // Perintah dijalankan melalui cmd.exe /C agar jendela konsol tertutup otomatis
+  SEInfo.lpFile := PChar('cmd.exe');
+  // Parameter: /C menjalankan perintah dan menutup, sisanya adalah perintah DCMTK yang kita buat
+  SEInfo.lpParameters := PChar('/C ' + DCMTKCommand);
+  SEInfo.nShow := SW_SHOWNORMAL; // Atau SW_HIDE untuk menyembunyikan jendela
+  SEInfo.fMask := SEE_MASK_NOCLOSEPROCESS; // Meminta handle proses untuk monitoring
+
+  if ShellExecuteEx(@SEInfo) then
+  begin
+    AppRunning := True;
+    // Tunggu hingga proses img2dcm.exe selesai
+    while AppRunning do
+    begin
+      Application.ProcessMessages;
+      AppRunning := (WaitForSingleObject(SEInfo.hProcess, 100) = WAIT_TIMEOUT);
+
+      if not AppRunning then
+      begin
+        // Proses selesai, periksa apakah file output sudah ada
+        if FileExists(OutputFile) then
+          MemoLog.Lines.Add('Konversi berhasil! File DCM tersimpan di: ' + OutputFile)
+        else
+          MemoLog.Lines.Add('Konversi gagal. Periksa path DCMTK dan file input/output.');
+
+        CloseHandle(SEInfo.hProcess);
+      end;
+    end;
+  end
+  else
+  begin
+    MemoLog.Lines.Add('Gagal menjalankan perintah DCMTK. Periksa path dan ketersediaan `img2dcm.exe`.');
+  end;
+
+end;
+
+function ExecuteCommandAndCaptureOutput(const CmdLine: string; out Output: string): Boolean;
+var
+  StartupInfo: TStartupInfo;
+  ProcessInfo: TProcessInformation;
+  Security: TSecurityAttributes;
+  ReadPipe, WritePipe: THandle;
+  Buffer: array[0..255] of Char;
+  BytesRead: DWORD;
+begin
+  Result := False;
+  Output := '';
+
+  // 1. Buat Pipe untuk menangkap Output (stdout & stderr)
+  Security.nLength := SizeOf(TSecurityAttributes);
+  Security.bInheritHandle := True;
+  Security.lpSecurityDescriptor := nil;
+
+  if not CreatePipe(ReadPipe, WritePipe, @Security, 0) then Exit;
+
+  // 2. Siapkan StartupInfo
+  FillChar(StartupInfo, SizeOf(StartupInfo), 0);
+  StartupInfo.cb := SizeOf(StartupInfo);
+  StartupInfo.hStdOutput := WritePipe;
+  StartupInfo.hStdError := WritePipe; // Tangkap error juga
+  StartupInfo.dwFlags := STARTF_USESTDHANDLES or STARTF_USESHOWWINDOW;
+  StartupInfo.wShowWindow := SW_HIDE; // Sembunyikan jendela command prompt
+
+  // 3. Buat Proses (Jalankan cURL)
+  if CreateProcess(nil, PChar(CmdLine), nil, nil, True, 0, nil, nil, StartupInfo, ProcessInfo) then
+  begin
+    CloseHandle(WritePipe); // Tutup handle write pipe pada parent process
+
+    // 4. Baca Output dari Pipe
+    repeat
+      BytesRead := 0;
+      // Baca file dari ReadPipe
+      if ReadFile(ReadPipe, Buffer, SizeOf(Buffer) - 1, BytesRead, nil) then
+      begin
+        if BytesRead > 0 then
+        begin
+          Buffer[BytesRead] := #0; // Null-terminate string
+          Output := Output + String(Buffer);
+        end
+      end else begin
+        Break;
+      end;
+    until BytesRead = 0;
+
+    // 5. Tunggu proses selesai dan tutup handle
+    WaitForSingleObject(ProcessInfo.hProcess, INFINITE);
+    CloseHandle(ProcessInfo.hProcess);
+    CloseHandle(ProcessInfo.hThread);
+
+    Result := True;
+  end;
+
+  CloseHandle(ReadPipe);
+end;
+
+
+procedure TfSendDcm.SendOrthanc;
+var
+  CurlCommand: string;
+  OutputResult: string;
+  LFileName: string;
+  LMsg: string;
+begin
+  LFileName := OutputFile;
+
+  // 2. Konstruksi Perintah cURL Lengkap
+  // -X POST: Metode HTTP
+  // -u USER:PASS: Otentikasi Dasar (Basic Auth)
+  // --data-binary @FILENAME: Mengirim konten file biner sebagai body POST
+  // -H "Content-Type: application/dicom": Header yang menentukan tipe konten
+  // -s: Silent mode (menyembunyikan progress bar cURL)
+
+  // Gunakan QUOTING untuk memastikan nama file dengan spasi ditangani dengan benar
+  CurlCommand := Format('curl -X POST -u "%s:%s" --data-binary "@%s" -H "Content-Type: application/dicom" -s "%s"',
+    [USERNAME, PASSWORD, LFileName, ORTHANC_URL]);
+
+  MemoLog.Lines.Clear;
+  MemoLog.Lines.Add('?? Perintah cURL yang Dijalankan:');
+  MemoLog.Lines.Add(CurlCommand);
+  MemoLog.Lines.Add('----------------------------------------');
+
+  // 3. Jalankan Perintah
+  if ExecuteCommandAndCaptureOutput(CurlCommand, OutputResult) then
+  begin
+    // cURL dijalankan (tidak berarti POST sukses, cek responsnya)
+    MemoLog.Lines.Add('? Proses cURL Selesai Dieksekusi.');
+    MemoLog.Lines.Add('Response (JSON dari Orthanc):');
+
+    // Response dari Orthanc akan berisi JSON yang menunjukkan keberhasilan/kegagalan
+    MemoLog.Lines.Add(OutputResult);
+
+    // Anda bisa menambahkan logika parsing JSON di sini untuk memeriksa status.
+    if Pos('"Status" : "Success"', OutputResult) > 0 then
+      LMsg := 'BERHASIL: File DICOM terkirim.'
+    else if Pos('"HTTP status code" : 401', OutputResult) > 0 then
+      LMsg := 'GAGAL: Otentikasi Gagal (401).'
+    else
+      LMsg := 'Peringatan: Cek respons di atas untuk detail.';
+
+    MemoLog.Lines.Add('--- STATUS ANALISIS ---');
+    MemoLog.Lines.Add(LMsg);
+
+  end
+  else
+  begin
+    MemoLog.Lines.Add('? Gagal menjalankan proses cURL (pastikan curl.exe ada di PATH).');
+  end;
+
+
+end;
+
+procedure TfSendDcm.FormActivate(Sender: TObject);
+begin
+Bersih;
+fLoad.ShowModal;
+end;
+
+procedure TfSendDcm.Tampil;
+begin
+
+
+Query:=
+'select permintaan_radiologi.noorder,permintaan_radiologi.no_rawat,reg_periksa.no_rkm_medis,pasien.nm_pasien,permintaan_radiologi.tgl_permintaan, pasien.tgl_lahir, '+
+'permintaan_radiologi.jam_permintaan,reg_periksa.kd_pj,penjab.png_jawab, jns_perawatan_radiologi.nm_perawatan, '+
+'permintaan_radiologi.tgl_sampel,permintaan_radiologi.jam_sampel, pasien.jk, '+
+'permintaan_radiologi.tgl_hasil,permintaan_radiologi.jam_hasil, permintaan_pemeriksaan_radiologi.kd_jenis_prw, '+
+'permintaan_radiologi.dokter_perujuk,dokter.nm_dokter,poliklinik.nm_poli,permintaan_radiologi.informasi_tambahan,permintaan_radiologi.diagnosa_klinis '+
+'from permintaan_radiologi inner join reg_periksa on permintaan_radiologi.no_rawat=reg_periksa.no_rawat '+
+'inner join pasien on reg_periksa.no_rkm_medis=pasien.no_rkm_medis '+
+'inner join dokter on permintaan_radiologi.dokter_perujuk=dokter.kd_dokter '+
+'inner join poliklinik on reg_periksa.kd_poli=poliklinik.kd_poli '+
+'inner join penjab on reg_periksa.kd_pj=penjab.kd_pj '+
+'inner join permintaan_pemeriksaan_radiologi on permintaan_pemeriksaan_radiologi.noorder=permintaan_radiologi.noorder '+
+'inner join jns_perawatan_radiologi on jns_perawatan_radiologi.kd_jenis_prw=permintaan_pemeriksaan_radiologi.kd_jenis_prw '+
+'where permintaan_radiologi.noorder=' + QuotedStr(eNoPermintaan.Text);
+
+ZQuery1.Close;
+ZQuery1.Active:=False;
+ZQuery1.SQL.Clear;
+ZQuery1.SQL.Add(Query);
+ZQuery1.Active:=True;
+
+
+if ZQuery1.IsEmpty=true then
+begin
+MessageDlg('No Permintaan Tidak Ada...',mtError, [MBOK],0);
+  exit;
+end else
+lACSN.Caption       :=ZQuery1noorder.AsString;
+lAnatomical.Caption :=ZQuery1nm_perawatan.AsString;
+lExposure.Caption   :=ZQuery1diagnosa_klinis.AsString;
+lDokter.Caption     :=ZQuery1nm_dokter.AsString;
+lJekel.Caption      :=ZQuery1jk.AsString;
+lTglSample.Caption  :=FormatDateTime('YYYY/MM/DD',ZQuery1tgl_sampel.AsDateTime);
+lPukul.Caption      :=FormatDateTime('hh:mm:ss',ZQuery1jam_sampel.AsDateTime);
+lNama.Caption       :=ZQuery1nm_pasien.AsString;
+lNoRawat.Caption    :=ZQuery1no_rawat.AsString;
+lNoRM.Caption       :=ZQuery1no_rkm_medis.AsString;
+lTglLahir.Caption   :=FormatDateTime('YYYY/MM/DD',ZQuery1tgl_lahir.AsDateTime);
+cModality.SetFocus;
+end;
+
+procedure TfSendDcm.eNoPermintaanKeyPress(Sender: TObject; var Key: Char);
+begin
+if key=#13 then
+begin
+  Tampil;
+end;
+end;
+
+procedure TfSendDcm.Button2Click(Sender: TObject);
+begin
+if (application.MessageBox('Yakin Mau Keluar...???','Gitu Doank',mb_yesno)=id_yes) then
+Application.Terminate;
+end;
+
+procedure TfSendDcm.Image1Click(Sender: TObject);
+begin
+btBaru.Click;
+end;
+
+end.

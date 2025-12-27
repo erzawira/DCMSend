@@ -1,0 +1,13 @@
+program Project1;
+
+uses
+  Forms,
+  uDcmsend in 'uDcmsend.pas' {fSendDcm};
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.CreateForm(TfSendDcm, fSendDcm);
+  Application.Run;
+end.
